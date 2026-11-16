@@ -7,3 +7,6 @@ documentation/.cache
 .env.local
 .venv/
 .env
+__pycache__/
+*.pyc
+.pytest_cache/
