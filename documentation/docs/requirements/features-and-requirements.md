@@ -6,3 +6,4 @@ sidebar_label: Features and Requirements
 # Features and Requirements
 
 ## Main Feature: Bot /search Command
+### Functional Requirements

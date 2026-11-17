@@ -6,7 +6,7 @@ from discord import app_commands
 from discord.ext import commands
 from bot.search_handler import process_search_request
 
-load_dotenv()
+load_dotenv(".env.local")
 # Create the Discord bot
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -27,8 +27,8 @@ async def search(interaction: discord.Interaction, query: str):
     await interaction.response.send_message(response)
 
 async def setup_hook():
-    await bot.tree.sync()
-
+    synced = await bot.tree.sync()
+    print(f"Globally synced {len(synced)} command(s)")
 
 bot.setup_hook = setup_hook
 
