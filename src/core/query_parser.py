@@ -16,11 +16,10 @@ client = genai.Client(api_key=api_key)
 
 MODEL = "gemma-4-26b-a4b-it"
 
-# Read the prompt from its text file, in three small steps
-this_folder = Path(__file__).parent                                  # the folder this .py file is in
-prompt_path = this_folder / "search_parser_prompt.txt"              # "/" joins path pieces
+# Read the prompt from its text file
+prompt_path = Path(__file__).parent/"prompts"/"query_parser_prompt.txt"  # the path to the prompt file
+print(f"Reading prompt from {prompt_path}")
 system_prompt = prompt_path.read_text(encoding="utf-8")             # the whole file as one string
-
 
 # ---------- The function that does the translating ----------
 
@@ -50,6 +49,6 @@ def translate_request(user_text):
 
 if __name__ == "__main__":
     result = translate_request(
-        "entry level software engineering jobs in Florida using Azure/AWS/Python/C, pays at least 50000"
+        "Entry level software developer in New York using python, javascript, react. Backend development. Pays 40000-60000 usd. Remote work is ok."
     )
     print(json.dumps(result, indent=2))  # indent=2 prints it neatly
