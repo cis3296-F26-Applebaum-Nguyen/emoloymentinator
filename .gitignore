@@ -10,3 +10,8 @@ documentation/.cache
 __pycache__/
 *.pyc
 .pytest_cache/
+
+#uv - python package and project manager
+.python-version
+pyproject.toml
+uv.lock
