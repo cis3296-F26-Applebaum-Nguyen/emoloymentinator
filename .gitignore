@@ -5,6 +5,11 @@ documentation/build
 documentation/.cache
 .DS_Store
 .env.local
+.venv/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
 
 #uv - python package and project manager
 .python-version
