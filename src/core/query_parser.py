@@ -5,6 +5,9 @@ from dotenv import load_dotenv, find_dotenv
 from google import genai
 from google.genai import types
 
+from core.validation import validate_parsed_request
+from core.models import request_from_dict
+
 # ---------- Setup: runs once when the file starts ----------
 
 # Find .env.local and load its values into environment variables
@@ -17,9 +20,9 @@ client = genai.Client(api_key=api_key)
 MODEL = "gemma-4-26b-a4b-it"
 
 # Read the prompt from its text file
-prompt_path = Path(__file__).parent/"prompts"/"query_parser_prompt.txt"  # the path to the prompt file
-print(f"Reading prompt from {prompt_path}")
-system_prompt = prompt_path.read_text(encoding="utf-8")             # the whole file as one string
+prompt_path = Path(__file__).parent / "prompts" / "query_parser_prompt.txt"
+system_prompt = prompt_path.read_text(encoding="utf-8")  # the whole file as one string
+
 
 # ---------- The function that does the translating ----------
 
@@ -48,7 +51,18 @@ def translate_request(user_text):
 # ---------- Test it by running this file directly ----------
 
 if __name__ == "__main__":
-    result = translate_request(
-        "Entry level software developer in New York using python, javascript, react. Backend development. Pays 40000-60000 usd. Remote work is ok."
+    # Step 1: the AI turns plain English into a dictionary
+    raw = translate_request(
+        "Entry level software developer in New York using python, javascript, react. "
+        "Backend development. Pays 40000-60000 usd. Remote work is ok."
     )
-    print(json.dumps(result, indent=2))  # indent=2 prints it neatly
+
+    # Step 2: validation checks it (raises ValueError if something is wrong)
+    clean = validate_parsed_request(raw)
+
+    # Step 3: dataclasses hold it in a form the rest of the program can use
+    if clean["is_job_search"]:
+        request = request_from_dict(clean)
+        print(request)               # dataclasses print their fields automatically
+    else:
+        print(clean["error"])        # the AI said it wasn't a job search
