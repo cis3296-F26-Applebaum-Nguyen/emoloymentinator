@@ -1,3 +1,8 @@
+"""
+Uses AI to convert natural-language job requests
+into structured search parameters.
+"""
+
 import os
 import json
 from pathlib import Path
@@ -5,7 +10,7 @@ from dotenv import load_dotenv, find_dotenv
 from google import genai
 from google.genai import types
 
-from core.validation import validate_parsed_request
+from core.validation import validate_parsed_request, parse_json_reply
 from core.models import request_from_dict
 
 # ---------- Setup: runs once when the file starts ----------
@@ -40,16 +45,7 @@ def translate_request(user_text):
         ),
     )
 
-    # The reply is text, but it can be None if the model returned nothing
-    reply = response.text
-    if reply is None:
-        raise ValueError("The AI returned no text")
-
-    # Remove extra spaces, then remove code fences if the model added them
-    reply = reply.strip()
-    reply = reply.replace("```json", "").replace("```", "").strip()
-
-    return json.loads(reply)
+    return parse_json_reply(response.text)
 
 
 # ---------- Test it by running this file directly ----------
@@ -60,6 +56,18 @@ if __name__ == "__main__":
         "Entry level software developer in New York using python, javascript, react. "
         "Backend development. Pays 40000-60000 usd. Remote work is ok."
     )
+    
+    # raw = translate_request(
+    #     "part time data analyst jobs this week"
+    # )
+    
+    # raw = translate_request(
+    #     "what's the weather in Miami?"
+    # )
+    
+    # raw = translate_request( //This one errors out
+    #     "find me a job"
+    # )
 
     # Step 2: validation checks it (raises ValueError if something is wrong)
     clean = validate_parsed_request(raw)

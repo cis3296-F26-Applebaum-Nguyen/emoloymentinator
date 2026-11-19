@@ -1,6 +1,24 @@
 import pytest
-from core.validation import validate_parsed_request
+from core.validation import validate_parsed_request, parse_json_reply
 
+
+def test_plain_json_is_parsed():
+    assert parse_json_reply('{"a": 1}') == {"a": 1}
+
+
+def test_code_fences_are_removed():
+    reply = '```json\n{"a": 1}\n```'  # the way models often wrap JSON
+    assert parse_json_reply(reply) == {"a": 1}
+
+
+def test_none_is_rejected():
+    with pytest.raises(ValueError):
+        parse_json_reply(None)  # response.text can be None
+
+
+def test_chatty_text_is_rejected():
+    with pytest.raises(ValueError):
+        parse_json_reply("Sure! Here are some jobs for you.")
 
 def make_valid():
     """Returns a fresh valid response. Each test changes just one thing."""

@@ -1,3 +1,5 @@
+import json  
+
 # Checks the AI's JSON answer and returns a clean copy, or raises ValueError.
 
 # The job_type values our prompt allows. Check these against the JobSpy README
@@ -90,3 +92,15 @@ def validate_parsed_request(data):
             "skills": skills,
         },
     }
+    
+def parse_json_reply(reply_text):
+    """Turns the AI's raw text into a dictionary, or raises ValueError."""
+    if reply_text is None:
+        raise ValueError("The AI returned no text")
+
+    # Remove extra spaces, then remove code fences if the model added them
+    cleaned = reply_text.strip()
+    cleaned = cleaned.replace("```json", "").replace("```", "").strip()
+
+    # If this isn't valid JSON it raises JSONDecodeError, which is a kind of ValueError
+    return json.loads(cleaned)
