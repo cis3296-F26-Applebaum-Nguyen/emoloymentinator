@@ -18,4 +18,16 @@ class JobQuery(BaseModel):
     hours_old: Optional[int] = None
     results_wanted: int = 10
 
-#def search_jobs(q: JobQuery) -> pd.DataFrame
+def search_jobs(q: JobQuery) -> pd.DataFrame:
+    df = scrape_jobs (
+        site_name=["indeed", "linkedin", "zip_recruiter", "google"],
+        search_term=q.search_term,
+        location=q.location
+        is_remote=q.is_remote,
+        job_type=q.job_type,
+        results_wanted=q.results_wanted,
+        hours=q.hours_old,
+        country_indeed="USA",
+    )
+
+    return df
