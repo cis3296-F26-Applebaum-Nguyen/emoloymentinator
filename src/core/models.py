@@ -1,3 +1,4 @@
+# Dataclasses that hold the validated search request in a usable form.
 from dataclasses import dataclass, field, asdict
 from typing import Optional
 
@@ -26,7 +27,9 @@ class JobSpyParams:
 class PostFilters:
     """Values our own code applies AFTER JobSpy returns results."""
     min_salary_annual: Optional[int] = None
-    skills: list = field(default_factory=list)  # see note below
+    # default_factory gives every object its own new list.
+    # (Writing "= []" would share one list between all objects.)
+    skills: list = field(default_factory=list)
 
 
 @dataclass

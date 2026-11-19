@@ -36,15 +36,19 @@ def translate_request(user_text):
         contents=message,
         config=types.GenerateContentConfig(
             system_instruction=system_prompt,
-            thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
         ),
     )
 
-    # The reply is text. Remove extra spaces, then remove code fences if the model added them
-    reply = response.text.strip()
+    # The reply is text, but it can be None if the model returned nothing
+    reply = response.text
+    if reply is None:
+        raise ValueError("The AI returned no text")
+
+    # Remove extra spaces, then remove code fences if the model added them
+    reply = reply.strip()
     reply = reply.replace("```json", "").replace("```", "").strip()
 
-    # Turn the JSON text into a Python dictionary
     return json.loads(reply)
 
 
