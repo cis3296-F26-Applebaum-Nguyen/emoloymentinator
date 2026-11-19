@@ -18,6 +18,8 @@ class JobQuery(BaseModel):
     hours_old: Optional[int] = None
     results_wanted: int = 10
 
+# uses the jobspy library to scrape job postings, the schema is used here
+# to fill in the function's parameters
 def search_jobs(q: JobQuery) -> pd.DataFrame:
     df = scrape_jobs (
         site_name=["indeed", "linkedin", "zip_recruiter", "google"],
@@ -31,3 +33,10 @@ def search_jobs(q: JobQuery) -> pd.DataFrame:
     )
 
     return df
+
+def export_csv(df, path="jobposting.csv"):
+    cols = ["title", "company", "location", "is_remote", "min_amount", "max_amount",
+            "interval", "job_url", "site", "date_posted"]
+    df[[c for c in cols if c in df.columns]].to_csv(path, index=False)
+    return path
+
