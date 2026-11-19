@@ -22,7 +22,7 @@ def search_jobs(q: JobQuery) -> pd.DataFrame:
     df = scrape_jobs (
         site_name=["indeed", "linkedin", "zip_recruiter", "google"],
         search_term=q.search_term,
-        location=q.location
+        location=q.location,
         is_remote=q.is_remote,
         job_type=q.job_type,
         results_wanted=q.results_wanted,
