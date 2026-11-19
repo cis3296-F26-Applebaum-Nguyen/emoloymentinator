@@ -2,7 +2,7 @@
 Uses AI to analyze job postings.
 Summarizes job details, requirements, and recommendations.
 """
-
+import json
 def build_review_prompt(job_posting: str) -> str:
     if not job_posting.strip():
         raise ValueError("Job posting cannot be empty")
@@ -16,3 +16,26 @@ def build_review_prompt(job_posting: str) -> str:
 Job posting:
 {job_posting}
 """
+def parse_review_response(response: str) -> dict:
+    try:
+        review = json.loads(response)
+    except json.JSONDecodeError as error:
+        raise ValueError("AI returned invalid JSON") from error
+
+    if not isinstance(review, dict):
+        raise ValueError("AI review must be an object")
+
+    if not isinstance(review.get("summary"), str) or not review["summary"].strip():
+        raise ValueError("AI review is missing a summary")
+
+    for field in ("skills", "tips"):
+        if not isinstance(review.get(field), list):
+            raise ValueError(f"AI review is missing {field}")
+
+    cover_letter = review.get("cover_letter_required")
+    if "cover_letter_required" not in review or (
+        cover_letter is not None and not isinstance(cover_letter, bool)
+    ):
+        raise ValueError("AI review has an invalid cover letter answer")
+
+    return review
