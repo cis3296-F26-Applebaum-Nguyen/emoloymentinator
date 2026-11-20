@@ -8,7 +8,6 @@ import discord
 import pandas as pd
 from dotenv import load_dotenv
 from discord.ext import commands
-from jobspy import scrape_jobs
 
 load_dotenv()
 
@@ -54,11 +53,9 @@ class Pages(discord.ui.View):
         self.index = 0
         self.message: discord.Message | None = None
         self.update_buttons()
-
     def update_buttons(self):
         self.prev_button.disabled = self.index == 0
         self.next_button.disabled = self.index == len(self.pages) - 1
-
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.author_id:
             await interaction.response.send_message(
@@ -67,50 +64,47 @@ class Pages(discord.ui.View):
             )
             return False
         return True
-
     @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary)
     async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.index -= 1
         self.update_buttons()
         await interaction.response.edit_message(embed=self.pages[self.index], view=self)
-
     @discord.ui.button(label="Next", style=discord.ButtonStyle.primary)
     async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.index += 1
         self.update_buttons()
         await interaction.response.edit_message(embed=self.pages[self.index], view=self)
-
     async def on_timeout(self):
         for child in self.children:
             child.disabled = True
         if self.message:
             await self.message.edit(view=self)
 
+def test_search(search_term: str, location: str) -> pd.DataFrame:
+    """
+    Test function to simulate job search results.
+    Returns a DataFrame with dummy job data.
+    """
+    data = {
+        "title": [f"Job Title {i}" for i in range(1, 6)],
+        "company": [f"Company {i}" for i in range(1, 6)],
+        "site": [f"Site {i}" for i in range(1, 6)],
+        "date_posted": [f"2024-06-{i:02d}" for i in range(1, 6)],
+        "location": [f"Location {i}" for i in range(1, 6)],
+        "job_url": [f"https://example.com/job{i}" for i in range(1, 6)],
+    }
+    return pd.DataFrame(data)
 
-def run_scrape(search_term: str, location: str) -> pd.DataFrame:
-    return scrape_jobs(
-        site_name=["linkedin", "indeed", "zip_recruiter", "glassdoor"],
-        search_term=search_term,
-        location=location,
-        results_wanted=20,
-        hours_old=72,
-        country_indeed="USA",
-    )
 
 
-@bot.tree.command(name="jobs", description="Search for jobs")
+@bot.tree.command(name="search", description="Search for jobs")
 async def jobs_cmd(interaction: discord.Interaction, search_term: str, location: str):
     await interaction.response.defer()
-
-    jobs = await asyncio.to_thread(run_scrape, search_term, location)
-
+    jobs = await asyncio.to_thread(test_search, search_term, location)
     if jobs is None or len(jobs) == 0:
         await interaction.followup.send("No jobs found. Try a different search or location.")
         return
-
     pages = build_pages(jobs)
     view = Pages(interaction.user.id, pages)
     view.message = await interaction.followup.send(embed=pages[0], view=view)
-
-
 bot.run(os.environ["DISCORD_TOKEN"])
