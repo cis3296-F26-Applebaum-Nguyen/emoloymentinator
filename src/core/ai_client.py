@@ -3,6 +3,7 @@ Communicates with the AI API.
 Sends prompts, receives responses, and handles API errors.
 """
 import os
+import time
 from google import genai
 
 
@@ -12,7 +13,7 @@ def ask_ai(prompt: str, client=None) -> str:
         if not api_key:
             raise RuntimeError("GEMINI_API_KEY is not set")
         client = genai.Client(api_key=api_key)
-
+    time.sleep(6)
     response = client.models.generate_content(
         model="gemma-4-26b-a4b-it",
         contents=prompt,
