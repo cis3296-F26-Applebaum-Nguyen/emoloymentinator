@@ -3,6 +3,8 @@ Uses AI to analyze job postings.
 Summarizes job details, requirements, and recommendations.
 """
 import json
+from .ai_client import ask_ai as default_ask_ai
+
 def build_review_prompt(job_posting: str) -> str:
     if not job_posting.strip():
         raise ValueError("Job posting cannot be empty")
@@ -39,13 +41,12 @@ def parse_review_response(response: str) -> dict:
         raise ValueError("AI review has an invalid cover letter answer")
 
     return review
-def review_posting(job_posting: str, ask_ai) -> dict:
+def review_posting(job_posting: str, ask_ai=default_ask_ai) -> dict:
     prompt = build_review_prompt(job_posting)
 
     for attempt in range(2):
-        response = ask_ai(prompt)
-
         try:
+            response = ask_ai(prompt)
             return parse_review_response(response)
         except ValueError as error:
             if attempt == 1:
