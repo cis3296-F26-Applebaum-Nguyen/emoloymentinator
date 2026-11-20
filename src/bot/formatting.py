@@ -86,12 +86,12 @@ def test_search(search_term: str, location: str) -> pd.DataFrame:
     Returns a DataFrame with dummy job data.
     """
     data = {
-        "title": [f"Job Title {i}" for i in range(1, 6)],
-        "company": [f"Company {i}" for i in range(1, 6)],
-        "site": [f"Site {i}" for i in range(1, 6)],
-        "date_posted": [f"2024-06-{i:02d}" for i in range(1, 6)],
-        "location": [f"Location {i}" for i in range(1, 6)],
-        "job_url": [f"https://example.com/job{i}" for i in range(1, 6)],
+        "title": [f"Job Title {i}" for i in range(1, 21)],
+        "company": [f"Company {i}" for i in range(1, 21)],
+        "site": [f"Site {i}" for i in range(1, 21)],
+        "date_posted": [f"2024-06-{i:02d}" for i in range(1, 21)],
+        "location": [f"Location {i}" for i in range(1, 21)],
+        "job_url": [f"https://example.com/job{i}" for i in range(1, 21)],
     }
     return pd.DataFrame(data)
 
