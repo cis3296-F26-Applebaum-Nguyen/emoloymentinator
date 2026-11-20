@@ -39,3 +39,16 @@ def parse_review_response(response: str) -> dict:
         raise ValueError("AI review has an invalid cover letter answer")
 
     return review
+def review_posting(job_posting: str, ask_ai) -> dict:
+    prompt = build_review_prompt(job_posting)
+
+    for attempt in range(2):
+        response = ask_ai(prompt)
+
+        try:
+            return parse_review_response(response)
+        except ValueError as error:
+            if attempt == 1:
+                raise ValueError(
+                    "AI returned an invalid job review after two attempts"
+                ) from error
