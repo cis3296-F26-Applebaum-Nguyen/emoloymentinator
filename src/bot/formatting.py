@@ -80,7 +80,7 @@ class Pages(discord.ui.View):
         if self.message:
             await self.message.edit(view=self)
 
-def test_search(search_term: str, location: str) -> pd.DataFrame:
+def test_search(search_term: str) -> pd.DataFrame:
     """
     Test function to simulate job search results.
     Returns a DataFrame with dummy job data.
@@ -98,9 +98,9 @@ def test_search(search_term: str, location: str) -> pd.DataFrame:
 
 
 @bot.tree.command(name="search", description="Search for jobs")
-async def jobs_cmd(interaction: discord.Interaction, search_term: str, location: str):
+async def jobs_cmd(interaction: discord.Interaction, search_term: str):
     await interaction.response.defer()
-    jobs = await asyncio.to_thread(test_search, search_term, location)
+    jobs = await asyncio.to_thread(test_search, search_term)
     if jobs is None or len(jobs) == 0:
         await interaction.followup.send("No jobs found. Try a different search or location.")
         return
