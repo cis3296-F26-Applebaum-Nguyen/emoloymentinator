@@ -6,27 +6,33 @@ into structured search parameters.
 import os
 import json
 from pathlib import Path
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
 from core.validation import validate_parsed_request, parse_json_reply
 from core.models import request_from_dict
 
-# ---------- Setup: runs once when the file starts ----------
+# ---------- Setup: reads the prompt; the API client is created lazily ----------
 
-# Find .env.local and load its values into environment variables
-load_dotenv(find_dotenv(".env.local", raise_error_if_not_found=True))
-
-# Read the API key from the environment and create the client
-api_key = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key)
-
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MODEL = "gemma-4-26b-a4b-it"
 
-# Read the prompt from its text file
 prompt_path = Path(__file__).parent / "prompts" / "query_parser_prompt.txt"
 system_prompt = prompt_path.read_text(encoding="utf-8")  # the whole file as one string
+
+client = None  # created on first use so imports/tests don't need an API key
+
+
+def _get_client():
+    global client
+    if client is None:
+        load_dotenv(PROJECT_ROOT / ".env.local", override=False)
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY is missing from .env.local")
+        client = genai.Client(api_key=api_key)
+    return client
 
 
 # ---------- The function that does the translating ----------
@@ -35,7 +41,7 @@ def translate_request(user_text):
     message = "<user_request>\n" + user_text + "\n</user_request>"
 
     # Send the request to Gemma and wait for the full reply
-    response = client.models.generate_content(
+    response = _get_client().models.generate_content(
         model=MODEL,
         contents=message,
         config=types.GenerateContentConfig(

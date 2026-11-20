@@ -44,6 +44,18 @@ class SearchRequest:
     filters: PostFilters
 
 
+@dataclass(frozen=True)
+class JobPosting:
+    """One normalized job row, ready to display or hand to the AI reviewer."""
+    title: str
+    company: str
+    location: str
+    job_url: str
+    site: str = ""
+    salary: Optional[str] = None
+    description: str = ""
+
+
 def request_from_dict(clean):
     """Converts the validator's output into a SearchRequest."""
     return SearchRequest(
