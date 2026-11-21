@@ -15,7 +15,20 @@ def test_search_command():
         search.callback(interaction, "Python developer")
     )
 
-    # Verify the bot responds with the handler's result
+    # Verify the bot responds with a numbered list of jobs
+    interaction.response.send_message.assert_awaited_once()
+    message = interaction.response.send_message.await_args.args[0]
+    assert "Python developer" in message
+    assert "**1.**" in message and "**5.**" in message
+    assert "/review" in message
+
+
+def test_search_blank_query_asks_for_input():
+    interaction = MagicMock()
+    interaction.response.send_message = AsyncMock()
+
+    asyncio.run(search.callback(interaction, "   "))
+
     interaction.response.send_message.assert_awaited_once_with(
-        "Received your search request: Python developer"
+        "Please provide a job search query."
     )

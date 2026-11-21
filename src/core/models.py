@@ -2,10 +2,19 @@
 Defines shared data structures for job searches,
 job postings, and AI reviews.
 """
-
-# Dataclasses that hold the validated search request in a usable form.
 from dataclasses import dataclass, field, asdict
 from typing import Optional
+
+
+@dataclass
+class JobPosting:
+    """A single job posting from a search result."""
+    title: str
+    company: str
+    location: str | None = None
+    url: str | None = None
+    description: str | None = None
+# Dataclasses that hold the validated search request in a usable form.
 
 
 @dataclass
