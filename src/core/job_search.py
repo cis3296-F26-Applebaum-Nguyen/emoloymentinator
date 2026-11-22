@@ -1,69 +1,83 @@
-"""
-Searches job boards using JobSpy.
-Returns matching job postings based on search parameters.
-"""
+"""JobSpy integration for searching jobs."""
 
-from pydantic import BaseModel
-from typing import Optional, Literal
-from google import genai
-from jobspy import scrape_jobs
-import pandas as pd
+from asyncio import to_thread
+import math
 
-# JobQuery is our schema for the job_search function to fill 
-class JobQuery(BaseModel):
-    search_term: str           # Job title
-    location: Optional[str] = None  # Philadlephia, New YOrk, etc.
-    is_remote: bool = False
-    job_type: Optional[Literal["fulltime", "parttime", "internship", "contract"]] = None
-    hours_old: Optional[int] = None
-    results_wanted: int = 10
+from .models import JobPosting, SearchRequest
 
-# uses the jobspy library to scrape job postings, the schema is used here
-# to fill in the function's parameters
-def search_jobs(q: JobQuery) -> pd.DataFrame:
-    df = scrape_jobs (
-        site_name=["indeed", "linkedin", "zip_recruiter", "google"],
-        search_term=q.search_term,
-        location=q.location,
-        is_remote=q.is_remote,
-        job_type=q.job_type,
-        results_wanted=q.results_wanted,
-        hours_old=q.hours_old,
-        country_indeed="USA",
-    )
-
-    return df
-
-def export_csv(df, path="jobposting.csv"):
-    cols = ["title", "company", "location", "is_remote", "min_amount", "max_amount",
-            "interval", "site", "date_posted", "job_url"]
-    df[[c for c in cols if c in df.columns]].to_csv(path, index=False)
-    return path
+try:
+    from jobspy import scrape_jobs
+except ImportError:
+    scrape_jobs = None
 
 
-'''
-testing area
-testing if the functions work by hardcoding the schema
-and then running search jobs
-'''
+class JobSearchError(Exception):
+    """The scraper could not complete a search."""
 
-#stand in for gemini's parsed prompt. this is hardcoded prompt for testing
-def parse_prompt(prompt: str) -> JobQuery:
-    return JobQuery(
-        search_term="software engineer",
-        location="pennsylvania",
-        is_remote="True",
-        job_type="fulltime",
-        hours_old="72",
-        results_wanted="10",
-    )
 
-def run_search(prompt: str) -> str:
-    q = parse_prompt(prompt)
-    df = search_jobs(q)
-    print(f"Found {len(df)} jobs")
-    return export_csv(df)
+def search_jobs(request: SearchRequest) -> list[JobPosting]:
+    if scrape_jobs is None:
+        raise JobSearchError("JobSpy is not installed.")
 
-if __name__ == "__main__":
-    path = run_search("find me a remote job in Florida")
-    print("Saved to", path)
+    kwargs = {
+        "site_name": ["indeed", "linkedin", "zip_recruiter", "google"],
+        "search_term": request.search_term,
+        "location": request.location,
+        "distance": request.distance,
+        "is_remote": request.is_remote,
+        "job_type": request.job_type,
+        "hours_old": request.hours_old,
+        "results_wanted": 20,
+        "country_indeed": request.country_indeed or "USA",
+    }
+    kwargs = {key: value for key, value in kwargs.items() if value is not None}
+
+    frame = scrape_jobs(**kwargs)
+    if frame is None or getattr(frame, "empty", False):
+        return []
+
+    def text_value(value) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if not text or text.lower() in {"nan", "<na>", "none"}:
+            return None
+        return text
+
+    jobs = []
+    for _, row in frame.iterrows():
+        title = text_value(row.get("title"))
+        if not title:
+            continue
+
+        if request.min_salary_annual is not None:
+            amount = row.get("max_amount")
+            if amount is None:
+                amount = row.get("min_amount")
+            try:
+                amount = float(amount)
+                if math.isnan(amount):
+                    continue
+                interval = str(row.get("interval") or "").lower()
+                if interval == "hourly":
+                    amount *= 2080
+                elif interval == "monthly":
+                    amount *= 12
+            except (TypeError, ValueError):
+                continue
+            if amount < request.min_salary_annual:
+                continue
+
+        jobs.append(JobPosting(
+            title=title,
+            company=text_value(row.get("company")) or "",
+            location=text_value(row.get("location")),
+            url=text_value(row.get("job_url")),
+            description=text_value(row.get("description")),
+        ))
+
+    return jobs
+
+
+async def search_jobs_async(request: SearchRequest) -> list[JobPosting]:
+    return await to_thread(search_jobs, request)

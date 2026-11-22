@@ -1,5 +1,6 @@
 import pytest
 from src.core.job_review import review_posting
+from src.core.models import JobPosting
 
 GOOD_RESPONSE = (
     '{"summary":"Python job","skills":["Python"],'
@@ -8,11 +9,11 @@ GOOD_RESPONSE = (
 
 
 def test_valid_review():
-    result = review_posting("Python job", lambda prompt: GOOD_RESPONSE)
-    assert result["summary"] == "Python job"
-    assert result["skills"] == ["Python"]
-    assert result["cover_letter_required"] is None
-    assert result["tips"] == []
+    result = review_posting(JobPosting(title="Python job", company="Acme"), lambda prompt: GOOD_RESPONSE)
+    assert result.summary == "Python job"
+    assert result.skills == ["Python"]
+    assert result.cover_letter_required is None
+    assert result.tips == []
 
 
 def test_broken_answer_retries_once():
@@ -23,7 +24,7 @@ def test_broken_answer_retries_once():
         calls.append(prompt)
         return next(answers)
 
-    assert review_posting("Python job", fake_ai)["summary"] == "Python job"
+    assert review_posting(JobPosting(title="Python job", company="Acme"), fake_ai).summary == "Python job"
     assert len(calls) == 2
 
 
@@ -35,6 +36,6 @@ def test_two_broken_answers_give_error():
         return "{}"
 
     with pytest.raises(ValueError, match="after two attempts"):
-        review_posting("Python job", fake_ai)
+        review_posting(JobPosting(title="Python job", company="Acme"), fake_ai)
 
     assert len(calls) == 2

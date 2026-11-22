@@ -1,106 +1,131 @@
-"""
-Uses AI to convert natural-language job requests
-into structured search parameters.
-"""
+"""Turns natural-language searches into SearchRequest objects."""
 
-import os
 import json
 from pathlib import Path
-from dotenv import load_dotenv, find_dotenv
-from google import genai
-from google.genai import types
 
-from core.validation import validate_parsed_request, parse_json_reply
-from core.models import request_from_dict
-
-# ---------- Setup: runs once when the file starts ----------
-
-# Find .env.local and load its values into environment variables
-load_dotenv(find_dotenv(".env.local", raise_error_if_not_found=True))
-
-# Read the API key from the environment and create the client
-api_key = os.getenv("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key)
-
-MODEL = "gemma-4-26b-a4b-it"
-
-# Read the prompt from its text file
-prompt_path = Path(__file__).parent / "prompts" / "query_parser_prompt.txt"
-system_prompt = prompt_path.read_text(encoding="utf-8")  # the whole file as one string
+from .ai_client import ask_ai
+from .models import SearchRequest
 
 
-# ---------- The function that does the translating ----------
-def translate_request(user_text):
-    # Wrap the user's text in the tags that the prompt tells the model to look for
-    message = "<user_request>\n" + user_text + "\n</user_request>"
-
-    # Send the request to Gemma and wait for the full reply
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=message,
-        config=types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
-        ),
-    )
-
-    return parse_json_reply(response.text)
+SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "query_parser_prompt.txt").read_text(
+    encoding="utf-8"
+)
 
 
 class SearchParseError(Exception):
-    """The text couldn't become a search. The message is safe to show the user."""
+    """A plain-language search could not be parsed."""
 
-def parse_search_request(user_text):
-    """Plain English in, SearchRequest out. Raises SearchParseError on failure."""
-    try:
-        raw = translate_request(user_text)        # step 1: ask the AI
-        clean = validate_parsed_request(raw)      # step 2: check the answer
-    except ValueError:
-        # Covers an empty AI reply, broken JSON, and a failed validation
-        raise SearchParseError("I couldn't understand that search. Try including a job title.")
 
-    # The AI decided this wasn't about jobs, so pass its reason along
-    if not clean["is_job_search"]:
-        raise SearchParseError(clean["error"])
+def parse_json_reply(reply_text: str | None) -> dict:
+    if reply_text is None:
+        raise ValueError("The AI returned no text")
+    cleaned = reply_text.strip().replace("```json", "").replace("```", "").strip()
+    data = json.loads(cleaned)
+    if not isinstance(data, dict):
+        raise ValueError("Response must be a JSON object")
+    return data
 
-    return request_from_dict(clean)               # step 3: dataclasses
 
-# ---------- Test it by running this file directly ----------
+def validate_parsed_request(data: dict) -> dict:
+    if not isinstance(data.get("is_job_search"), bool):
+        raise ValueError("is_job_search must be true or false")
 
-if __name__ == "__main__":
-    # # Step 1: the AI turns plain English into a dictionary
-    # raw = translate_request(
-    #     "Entry level software developer in New York using python, javascript, react. "
-    #     "Backend development. Pays 40000-60000 usd. Remote work is ok."
-    # )
-    
-    # # raw = translate_request(
-    # #     "part time data analyst jobs this week"
-    # # )
-    
-    # # raw = translate_request(
-    # #     "what's the weather in Miami?"
-    # # )
-    
-    # # raw = translate_request( //This one errors out
-    # #     "find me a job"
-    # # )
+    if not data["is_job_search"]:
+        return {
+            "is_job_search": False,
+            "error": data.get("error") or "The request is not about searching for jobs.",
+            "jobspy_params": None,
+            "post_filters": None,
+        }
 
-    # # Step 2: validation checks it (raises ValueError if something is wrong)
-    # clean = validate_parsed_request(raw)
+    params = data.get("jobspy_params")
+    filters = data.get("post_filters")
+    if not isinstance(params, dict) or not isinstance(filters, dict):
+        raise ValueError("jobspy_params and post_filters must be objects")
 
-    # # Step 3: dataclasses hold it in a form the rest of the program can use
-    # if clean["is_job_search"]:
-    #     request = request_from_dict(clean)
-    #     print(request)               # dataclasses print their fields automatically
-    # else:
-    #     print(clean["error"])        # the AI said it wasn't a job search
-    
-    try:
-        request = parse_search_request(
-            "Entry level software developer in New York using python, javascript, react. "
-            "Backend development. Pays 40000-60000 usd. Remote work is ok."
-        )
-        print(request)
-    except SearchParseError as e:
-        print(f"Error: {e}")
+    search_term = params.get("search_term")
+    if not isinstance(search_term, str) or not search_term.strip():
+        raise ValueError("search_term must be non-empty text")
+
+    allowed_types = {
+        "fulltime", "parttime", "contract", "temporary", "internship",
+        "perdiem", "volunteer", "other",
+    }
+    job_type = params.get("job_type")
+    if job_type is not None and job_type not in allowed_types:
+        raise ValueError("Unknown job_type")
+
+    def optional_text(name: str, value):
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"{name} must be text or null")
+        return value
+
+    def optional_positive_int(name: str, value):
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise ValueError(f"{name} must be a positive integer or null")
+        return value
+
+    is_remote = params.get("is_remote")
+    if is_remote is not None and not isinstance(is_remote, bool):
+        raise ValueError("is_remote must be true, false, or null")
+
+    skills = filters.get("skills")
+    if not isinstance(skills, list) or not all(isinstance(skill, str) for skill in skills):
+        raise ValueError("skills must be a list of text values")
+
+    return {
+        "is_job_search": True,
+        "error": None,
+        "jobspy_params": {
+            "search_term": search_term.strip(),
+            "location": optional_text("location", params.get("location")),
+            "distance": optional_positive_int("distance", params.get("distance")),
+            "job_type": job_type,
+            "is_remote": is_remote,
+            "hours_old": optional_positive_int("hours_old", params.get("hours_old")),
+            "country_indeed": optional_text("country_indeed", params.get("country_indeed")),
+        },
+        "post_filters": {
+            "min_salary_annual": optional_positive_int(
+                "min_salary_annual", filters.get("min_salary_annual")
+            ),
+            "skills": skills,
+        },
+    }
+
+
+def translate_request(user_text: str, ai_fn=ask_ai) -> dict:
+    prompt = f"{SYSTEM_PROMPT}\n\n<user_request>\n{user_text}\n</user_request>"
+    return parse_json_reply(ai_fn(prompt))
+
+
+def parse_search_request(user_text: str, ai_fn=ask_ai) -> SearchRequest:
+    for attempt in range(2):
+        try:
+            raw = translate_request(user_text, ai_fn)
+            clean = validate_parsed_request(raw)
+            if not clean["is_job_search"]:
+                raise SearchParseError(clean["error"])
+
+            params = clean["jobspy_params"]
+            filters = clean["post_filters"]
+            return SearchRequest(
+                search_term=params["search_term"],
+                location=params["location"],
+                distance=params["distance"],
+                job_type=params["job_type"],
+                is_remote=params["is_remote"],
+                hours_old=params["hours_old"],
+                country_indeed=params["country_indeed"],
+                min_salary_annual=filters["min_salary_annual"],
+                skills=filters["skills"],
+            )
+        except SearchParseError:
+            raise
+        except (ValueError, json.JSONDecodeError):
+            if attempt == 1:
+                raise SearchParseError(
+                    "I couldn't understand that search. Try including a job title."
+                )

@@ -1,12 +1,21 @@
-"""
-Uses AI to analyze job postings.
-Summarizes job details, requirements, and recommendations.
-"""
-import json
-from .ai_client import ask_ai as default_ask_ai
+"""Reviews a job posting using the shared AI client."""
 
-def build_review_prompt(job_posting: str) -> str:
-    if not job_posting.strip():
+import json
+
+from .ai_client import ask_ai as default_ask_ai
+from .models import JobPosting, JobReview
+
+
+def build_review_prompt(job: JobPosting) -> str:
+    text = "\n".join(
+        value for value in (
+            f"Title: {job.title}",
+            f"Company: {job.company}",
+            f"Location: {job.location}" if job.location else "",
+            job.description or "",
+        ) if value
+    )
+    if not text.strip():
         raise ValueError("Job posting cannot be empty")
 
     return f"""Review this job posting. Return only JSON with these fields:
@@ -16,38 +25,44 @@ def build_review_prompt(job_posting: str) -> str:
 - tips: a list of useful application tips
 
 Job posting:
-{job_posting}
+{text}
 """
-def parse_review_response(response: str) -> dict:
+
+
+def parse_review_response(response: str) -> JobReview:
     try:
-        review = json.loads(response)
+        data = json.loads(response)
     except json.JSONDecodeError as error:
         raise ValueError("AI returned invalid JSON") from error
 
-    if not isinstance(review, dict):
+    if not isinstance(data, dict):
         raise ValueError("AI review must be an object")
-
-    if not isinstance(review.get("summary"), str) or not review["summary"].strip():
+    if not isinstance(data.get("summary"), str) or not data["summary"].strip():
         raise ValueError("AI review is missing a summary")
+    if not isinstance(data.get("skills"), list):
+        raise ValueError("AI review is missing skills")
+    if not isinstance(data.get("tips"), list):
+        raise ValueError("AI review is missing tips")
 
-    for field in ("skills", "tips"):
-        if not isinstance(review.get(field), list):
-            raise ValueError(f"AI review is missing {field}")
-
-    cover_letter = review.get("cover_letter_required")
-    if "cover_letter_required" not in review or (
+    cover_letter = data.get("cover_letter_required")
+    if "cover_letter_required" not in data or (
         cover_letter is not None and not isinstance(cover_letter, bool)
     ):
         raise ValueError("AI review has an invalid cover letter answer")
 
-    return review
-def review_posting(job_posting: str, ask_ai=default_ask_ai) -> dict:
-    prompt = build_review_prompt(job_posting)
+    return JobReview(
+        summary=data["summary"].strip(),
+        skills=data["skills"],
+        cover_letter_required=cover_letter,
+        tips=data["tips"],
+    )
 
+
+def review_posting(job: JobPosting, ask_ai=default_ask_ai) -> JobReview:
+    prompt = build_review_prompt(job)
     for attempt in range(2):
         try:
-            response = ask_ai(prompt)
-            return parse_review_response(response)
+            return parse_review_response(ask_ai(prompt))
         except ValueError as error:
             if attempt == 1:
                 raise ValueError(
