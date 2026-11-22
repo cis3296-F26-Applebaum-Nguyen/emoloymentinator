@@ -2,7 +2,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from bot.discord_bot import search
+from src.bot.discord_bot import search
 
 
 def test_search_command():

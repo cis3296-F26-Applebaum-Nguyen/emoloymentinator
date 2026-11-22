@@ -1,5 +1,5 @@
 
-from bot.search_handler import process_search_request
+from src.bot.search_handler import process_search_request
 
 
 def test_valid_search():

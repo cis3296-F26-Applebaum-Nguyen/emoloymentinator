@@ -18,7 +18,7 @@ DISCORD_MESSAGE_LIMIT = 2000
 def placeholder_results(query: str) -> list[JobPosting]:
     """
     Stand-in search results until the real search (#14) is wired into /search.
-    Replace the call in bot/discord_bot.py with the real job list.
+    Replace the call in src/bot/discord_bot.py with the real job list.
     """
     samples = [
         ("Junior", "Acme Software", "Philadelphia, PA"),

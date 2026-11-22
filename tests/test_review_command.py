@@ -95,7 +95,7 @@ def test_long_review_is_truncated_to_discord_limit():
 # --- /search saves results so /review can find them ---
 
 def test_search_then_review_finds_saved_job():
-    from bot.discord_bot import search
+    from src.bot.discord_bot import search
 
     search_interaction = MagicMock()
     search_interaction.user.id = 7
@@ -108,7 +108,7 @@ def test_search_then_review_finds_saved_job():
 
 
 def test_blank_search_does_not_save_results():
-    from bot.discord_bot import search
+    from src.bot.discord_bot import search
 
     interaction = MagicMock()
     interaction.user.id = 8
