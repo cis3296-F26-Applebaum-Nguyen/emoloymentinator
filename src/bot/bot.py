@@ -29,7 +29,12 @@ def create_bot(parse_fn, search_fn, save_fn, review_fn) -> commands.Bot:
     @bot.tree.command(name="review", description="Get an AI review of a job from your last search")
     @app_commands.describe(number="The job number from your last /search list")
     async def review(interaction: discord.Interaction, number: int):
-        await handle_review(interaction, number, review_fn)
+        try:
+            await handle_review(interaction, number, review_fn)
+        except discord.NotFound as error:
+            if error.code == 10062:
+                return
+            raise
 
     async def setup_hook():
         synced = await bot.tree.sync()

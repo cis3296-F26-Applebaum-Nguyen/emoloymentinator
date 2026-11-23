@@ -1,6 +1,9 @@
 """Handles Discord slash command behavior."""
 
+from asyncio import to_thread
 from collections.abc import Callable
+
+from discord.errors import NotFound
 
 from .formatting import DISCORD_MESSAGE_LIMIT, format_job_list, format_job_review, split_message
 from ..core.models import JobPosting, JobReview
@@ -47,7 +50,10 @@ def build_review_message(
     except InvalidJobNumberError as error:
         return f"Job {error.number} isn't in your list. Pick a number from 1 to {error.total}."
 
-    answer = review_fn(job)
+    try:
+        answer = review_fn(job)
+    except Exception as error:
+        return f"I couldn't complete that review: {error}"
     message = format_job_review(answer) if isinstance(answer, JobReview) else answer
     if len(message) > DISCORD_MESSAGE_LIMIT:
         message = split_message(message)[0]
@@ -94,8 +100,24 @@ async def handle_review(
     number: int,
     review_fn: Callable[[JobPosting], JobReview | str] = fake_review,
 ) -> None:
-    await interaction.response.defer()
-    await interaction.followup.send("Working on it...")
-    message = build_review_message(interaction.user.id, number, review_fn)
+    try:
+        await interaction.response.defer()
+        await interaction.followup.send("Working on it...")
+    except NotFound as error:
+        if error.code == 10062:
+            return
+        raise
+
+    message = await to_thread(
+        build_review_message,
+        interaction.user.id,
+        number,
+        review_fn,
+    )
     for piece in split_message(message):
-        await interaction.followup.send(piece)
+        try:
+            await interaction.followup.send(piece)
+        except NotFound as error:
+            if error.code == 10062:
+                return
+            raise

@@ -23,7 +23,8 @@ def ask_ai(prompt: str, client=None, api_key: str | None = None,
                 contents=prompt,
             )
         except errors.APIError as error:
-            if error.code != 429 or attempt == 1:
+            retryable = error.code in (429, 503, 504)
+            if not retryable or attempt == 1:
                 raise
             continue
 

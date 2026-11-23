@@ -16,6 +16,15 @@ def test_valid_review():
     assert result.tips == []
 
 
+def test_code_fenced_review_is_parsed():
+    response = "```json\n" + GOOD_RESPONSE + "\n```"
+    result = review_posting(
+        JobPosting(title="Python job", company="Acme"),
+        lambda prompt: response,
+    )
+    assert result.summary == "Python job"
+
+
 def test_broken_answer_retries_once():
     answers = iter(["{}", GOOD_RESPONSE])
     calls = []

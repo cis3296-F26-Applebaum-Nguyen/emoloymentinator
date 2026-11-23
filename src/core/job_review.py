@@ -30,8 +30,10 @@ Job posting:
 
 
 def parse_review_response(response: str) -> JobReview:
+    cleaned = response.strip()
+    cleaned = cleaned.replace("```json", "").replace("```", "").strip()
     try:
-        data = json.loads(response)
+        data = json.loads(cleaned)
     except json.JSONDecodeError as error:
         raise ValueError("AI returned invalid JSON") from error
 

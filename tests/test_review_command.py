@@ -2,6 +2,7 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from discord.errors import NotFound
 
 from src.bot.commands import build_review_message, handle_review, handle_search
 from src.core.models import JobPosting, SearchRequest
@@ -142,3 +143,14 @@ def test_handle_review_defers_then_sends_followup():
 
     interaction.response.defer.assert_awaited_once()
     assert interaction.followup.send.await_args.args[0] == "review:Job 3"
+
+
+def test_handle_review_ignores_expired_interaction():
+    interaction = MagicMock()
+    interaction.response.defer = AsyncMock(
+        side_effect=NotFound(MagicMock(), {"code": 10062, "message": "Unknown interaction"})
+    )
+
+    asyncio.run(handle_review(interaction, 1, echo_review))
+
+    interaction.response.defer.assert_awaited_once()
