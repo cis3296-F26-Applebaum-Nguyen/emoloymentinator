@@ -23,6 +23,8 @@ class JobPosting:
     location: str | None = None
     url: str | None = None
     description: str | None = None
+    site: str | None = None          # which job board it came from
+    date_posted: str | None = None   # kept as text, so no date handling needed
 
 
 @dataclass

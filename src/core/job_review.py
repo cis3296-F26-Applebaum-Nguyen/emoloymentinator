@@ -35,8 +35,10 @@ def clean_text_list(value) -> list[str]:
 
 
 def parse_review_response(response: str) -> JobReview:
+    cleaned = response.strip()
+    cleaned = cleaned.replace("```json", "").replace("```", "").strip()
     try:
-        data = json.loads(response)
+        data = json.loads(cleaned)
     except json.JSONDecodeError as error:
         raise ValueError("AI returned invalid JSON") from error
 
@@ -71,11 +73,12 @@ def parse_review_response(response: str) -> JobReview:
 
 def review_posting(job: JobPosting, ask_ai=default_ask_ai) -> JobReview:
     prompt = build_review_prompt(job)
+    last_error: ValueError | None = None
     for attempt in range(2):
         try:
             return parse_review_response(ask_ai(prompt))
         except ValueError as error:
+            last_error = error
             if attempt == 1:
-                raise ValueError(
-                    "AI returned an invalid job review after two attempts"
-                ) from error
+                break
+    raise ValueError("AI returned an invalid job review after two attempts") from last_error

@@ -20,7 +20,7 @@ def search_jobs(request: SearchRequest) -> list[JobPosting]:
         raise JobSearchError("JobSpy is not installed.")
 
     kwargs = {
-        "site_name": ["indeed", "linkedin", "zip_recruiter", "google"],
+        "site_name": ["indeed", "linkedin", "zip_recruiter", "google", "glassdoor"],
         "search_term": request.search_term,
         "location": request.location,
         "distance": request.distance,
@@ -54,6 +54,8 @@ def search_jobs(request: SearchRequest) -> list[JobPosting]:
             amount = row.get("max_amount")
             if amount is None:
                 amount = row.get("min_amount")
+            if amount is None:
+                continue
             try:
                 amount = float(amount)
                 if math.isnan(amount):
@@ -74,6 +76,8 @@ def search_jobs(request: SearchRequest) -> list[JobPosting]:
             location=text_value(row.get("location")),
             url=text_value(row.get("job_url")),
             description=text_value(row.get("description")),
+            site=text_value(row.get("site")),
+            date_posted=text_value(row.get("date_posted")),
         ))
 
     return jobs

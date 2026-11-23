@@ -5,7 +5,7 @@ from collections.abc import Callable
 
 from discord.errors import NotFound
 
-from .formatting import DISCORD_MESSAGE_LIMIT, format_job_list, format_job_review, split_message
+from .formatting import DISCORD_MESSAGE_LIMIT, format_job_review, split_message
 from ..core.models import JobPosting, JobReview
 from ..core.query_parser import SearchParseError, parse_search_request
 from ..core.job_search import JobSearchError, search_jobs_async
@@ -16,6 +16,7 @@ from ..core.result_store import (
     get_job,
 )
 
+from .views import JobListView
 
 def placeholder_results(query: str) -> list[JobPosting]:
     samples = [
@@ -91,8 +92,10 @@ async def handle_search(
 
     if save_fn is not None:
         save_fn(interaction.user.id, jobs)
-    for piece in split_message(format_job_list(query.strip(), jobs)):
-        await interaction.followup.send(piece)
+
+    view = JobListView(jobs, interaction.user.id)
+    # followup.send returns the sent message, which on_timeout needs
+    view.message = await interaction.followup.send(embed=view.build_embed(), view=view)
 
 
 async def handle_review(

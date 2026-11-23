@@ -25,9 +25,11 @@ def test_search_command():
     asyncio.run(search.callback(interaction, "Python developer"))
 
     interaction.response.send_message.assert_awaited_once_with("Working on it...")
-    message = interaction.followup.send.await_args_list[-1].args[0]
-    assert "Python developer" in message
-    assert "**1.**" in message
+    kwargs = interaction.followup.send.await_args_list[-1].kwargs
+    embed = kwargs["embed"]
+    assert embed.title == "Job 1"
+    title_field = next(field for field in embed.fields if field.name == "Title")
+    assert "Python developer" in title_field.value
 
 
 def test_search_blank_query_asks_for_input():
