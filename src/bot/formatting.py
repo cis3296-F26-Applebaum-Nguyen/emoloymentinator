@@ -36,17 +36,22 @@ def format_job_list(query: str, jobs: Sequence[JobPosting]) -> str:
 
 def format_job_review(review: JobReview) -> str:
     lines = [review.summary]
+
+    # Each section is only added when it has content
+    if review.years_experience:
+        lines += ["", f"**Experience:** {review.years_experience}"]
+    if review.tech_stack:
+        lines += ["", "**Tech stack:** " + ", ".join(review.tech_stack)]
     if review.skills:
-        lines.append("")
-        lines.append("Skills: " + ", ".join(review.skills))
+        lines += ["", "**Skills:** " + ", ".join(review.skills)]
+    if review.other_requirements:
+        lines += ["", "**Other requirements:**"]
+        lines += [f"- {item}" for item in review.other_requirements]
     if review.cover_letter_required is not None:
-        lines.append("")
-        lines.append(
-            "Cover letter: "
-            + ("required" if review.cover_letter_required else "not mentioned")
-        )
+        lines += ["", "**Cover letter:** " + (
+            "required" if review.cover_letter_required else "not required"
+        )]
     if review.tips:
-        lines.append("")
-        lines.append("Tips:")
-        lines.extend(f"- {tip}" for tip in review.tips)
+        lines += ["", "**Tips:**"]
+        lines += [f"- {tip}" for tip in review.tips]
     return "\n".join(lines)

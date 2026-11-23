@@ -31,3 +31,6 @@ class JobReview:
     skills: list[str] = field(default_factory=list)
     cover_letter_required: bool | None = None
     tips: list[str] = field(default_factory=list)
+    years_experience: str | None = None
+    tech_stack: list[str] = field(default_factory=list)
+    other_requirements: list[str] = field(default_factory=list)
