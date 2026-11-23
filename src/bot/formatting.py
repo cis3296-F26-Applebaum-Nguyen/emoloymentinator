@@ -1,127 +1,72 @@
-"""
-Formats job search results and AI reviews into Discord messages.
-"""
+"""Formats bot output for Discord."""
 
 from collections.abc import Sequence
-
-from src.core.models import JobPosting
-
-
-def format_job_list(query: str, jobs: Sequence[JobPosting]) -> str:
-    """Build the numbered list shown after /search."""
-    lines = [f"Found {len(jobs)} jobs for **{query}**:", ""]
-    for number, job in enumerate(jobs, start=1):
-        where = f" ({job.location})" if job.location else ""
-        lines.append(f"**{number}.** {job.title} - {job.company}{where}")
-    lines.append("")
-    lines.append("Use `/review <number>` to get an AI review of a job.")
-    return "\n".join(lines)
-
-# Need to move some below code logic (i.e. the bot creation into discord_bot.py)
-
-import os
-import asyncio
+from ..core.models import JobPosting, JobReview
 import discord
-import pandas as pd
-from dotenv import load_dotenv
-from discord.ext import commands
 
-load_dotenv()
-
-intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-@bot.event
-async def on_ready():
-    await bot.tree.sync()
-    print(f"Logged in as {bot.user}")
+DISCORD_MESSAGE_LIMIT = 2000
 
 
-def clean(value, fallback="Not listed") -> str:
-    if value is None or pd.isna(value):
-        return fallback
-    return str(value)
+def shorten(text: str, limit: int = 1000) -> str:
+    # Discord rejects embed fields over 1024 characters, so trim long values
+    return text if len(text) <= limit else text[: limit - 3] + "..."
 
 
-def build_pages(jobs: pd.DataFrame) -> list[discord.Embed]:
-    pages = []
-    total = len(jobs)
-    for i, (_, job) in enumerate(jobs.iterrows(), start=1):
-        page = discord.Embed(
-            title=f"Job {i}",
-            color=discord.Color.blue(),
-        )
-        page.add_field(name="Title", value=clean(job.get("title")), inline=True)
-        page.add_field(name="Company", value=clean(job.get("company")), inline=True)
-        page.add_field(name="Site", value=clean(job.get("site")), inline=True)
-        page.add_field(name="Posted", value=clean(job.get("date_posted")), inline=True)
-        page.add_field(name="Location", value=clean(job.get("location")), inline=False)
-        page.add_field(name="Link", value=f"[Open job]({clean(job.get('job_url'), 'https://example.com')})", inline=False)
-        page.set_footer(text=f"Job {i}/{total}")
-        pages.append(page)
-    return pages
+def build_job_embed(job: JobPosting, number: int, total: int) -> discord.Embed:
+    embed = discord.Embed(title=f"Job {number}")
+
+    # inline=True puts fields side by side (Title / Company / Site in your mockup)
+    embed.add_field(name="Title", value=shorten(job.title), inline=True)
+    embed.add_field(name="Company", value=shorten(job.company) or "Not listed", inline=True)
+    embed.add_field(name="Site", value=job.site or "Unknown", inline=True)
+
+    # inline=False gives each of these its own row
+    embed.add_field(name="Posted", value=job.date_posted or "Not listed", inline=False)
+    embed.add_field(name="Location", value=shorten(job.location or "Not listed"), inline=False)
+
+    # [text](url) is Discord's markdown for a clickable link
+    link = f"[Open job]({job.url})" if job.url else "Not available"
+    embed.add_field(name="Link", value=link, inline=False)
+
+    embed.set_footer(text=f"Job {number}/{total} • /review {number} for an AI review")
+    return embed
 
 
-class Pages(discord.ui.View):
-    def __init__(self, author_id: int, pages: list[discord.Embed]):
-        super().__init__(timeout=300)
-        self.author_id = author_id
-        self.pages = pages
-        self.index = 0
-        self.message: discord.Message | None = None
-        self.update_buttons()
-    def update_buttons(self):
-        self.prev_button.disabled = self.index == 0
-        self.next_button.disabled = self.index == len(self.pages) - 1
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.author_id:
-            await interaction.response.send_message(
-                "Only the person who ran the command can use these buttons.",
-                ephemeral=True,
-            )
-            return False
-        return True
-    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary)
-    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.index -= 1
-        self.update_buttons()
-        await interaction.response.edit_message(embed=self.pages[self.index], view=self)
-    @discord.ui.button(label="Next", style=discord.ButtonStyle.primary)
-    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.index += 1
-        self.update_buttons()
-        await interaction.response.edit_message(embed=self.pages[self.index], view=self)
-    async def on_timeout(self):
-        for child in self.children:
-            child.disabled = True
-        if self.message:
-            await self.message.edit(view=self)
+def split_message(text: str, limit: int = DISCORD_MESSAGE_LIMIT) -> list[str]:
+    if len(text) <= limit:
+        return [text]
 
-def test_search(search_term: str) -> pd.DataFrame:
-    """
-    Test function to simulate job search results.
-    Returns a DataFrame with dummy job data.
-    """
-    data = {
-        "title": [f"Job Title {i}" for i in range(1, 21)],
-        "company": [f"Company {i}" for i in range(1, 21)],
-        "site": [f"Site {i}" for i in range(1, 21)],
-        "date_posted": [f"2024-06-{i:02d}" for i in range(1, 21)],
-        "location": [f"Location {i}" for i in range(1, 21)],
-        "job_url": [f"https://example.com/job{i}" for i in range(1, 21)],
-    }
-    return pd.DataFrame(data)
+    pieces = []
+    start = 0
+    while start < len(text):
+        end = min(start + limit, len(text))
+        if end < len(text):
+            newline = text.rfind("\n", start, end)
+            if newline > start:
+                end = newline + 1
+        pieces.append(text[start:end])
+        start = end
+    return pieces
 
 
+def format_job_review(review: JobReview) -> str:
+    lines = [review.summary]
 
-@bot.tree.command(name="search", description="Search for jobs")
-async def jobs_cmd(interaction: discord.Interaction, search_term: str):
-    await interaction.response.defer()
-    jobs = await asyncio.to_thread(test_search, search_term)
-    if jobs is None or len(jobs) == 0:
-        await interaction.followup.send("No jobs found. Try a different search or location.")
-        return
-    pages = build_pages(jobs)
-    view = Pages(interaction.user.id, pages)
-    view.message = await interaction.followup.send(embed=pages[0], view=view)
-bot.run(os.environ["DISCORD_TOKEN"])
+    # Each section is only added when it has content
+    if review.years_experience:
+        lines += ["", f"**Experience:** {review.years_experience}"]
+    if review.tech_stack:
+        lines += ["", "**Tech stack:** " + ", ".join(review.tech_stack)]
+    if review.skills:
+        lines += ["", "**Skills:** " + ", ".join(review.skills)]
+    if review.other_requirements:
+        lines += ["", "**Other requirements:**"]
+        lines += [f"- {item}" for item in review.other_requirements]
+    if review.cover_letter_required is not None:
+        lines += ["", "**Cover letter:** " + (
+            "required" if review.cover_letter_required else "not required"
+        )]
+    if review.tips:
+        lines += ["", "**Tips:**"]
+        lines += [f"- {tip}" for tip in review.tips]
+    return "\n".join(lines)

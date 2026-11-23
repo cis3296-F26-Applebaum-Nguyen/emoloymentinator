@@ -1,25 +1,24 @@
-"""
-Handles Discord slash commands such as /search and /review.
-Connects user commands to the backend functionality.
-"""
+"""Handles Discord slash command behavior."""
 
+from asyncio import to_thread
 from collections.abc import Callable
 
-from src.core.models import JobPosting
-from src.core.result_store import (
+from discord.errors import NotFound
+
+from .formatting import DISCORD_MESSAGE_LIMIT, format_job_review, split_message
+from ..core.models import JobPosting, JobReview
+from ..core.query_parser import SearchParseError, parse_search_request
+from ..core.job_search import JobSearchError, search_jobs_async
+from ..core.job_review import review_posting
+from ..core.result_store import (
     InvalidJobNumberError,
     NoSearchResultsError,
     get_job,
 )
 
-DISCORD_MESSAGE_LIMIT = 2000
-
+from .views import JobListView
 
 def placeholder_results(query: str) -> list[JobPosting]:
-    """
-    Stand-in search results until the real search (#14) is wired into /search.
-    Replace the call in bot/discord_bot.py with the real job list.
-    """
     samples = [
         ("Junior", "Acme Software", "Philadelphia, PA"),
         ("Senior", "Globex Corp", "Remote"),
@@ -33,47 +32,95 @@ def placeholder_results(query: str) -> list[JobPosting]:
     ]
 
 
-def fake_review(job: JobPosting) -> str:
-    """
-    Placeholder review used until review_posting() from issue #9 exists.
-    Swap it out by passing review_posting as `review_fn`.
-    """
-    return (
-        f"**Review of {job.title} at {job.company}**\n"
-        "(Placeholder review: the real AI review is not hooked up yet.)"
+def fake_review(job: JobPosting) -> JobReview:
+    return JobReview(
+        summary=f"Review of {job.title} at {job.company}",
+        tips=["Review the responsibilities carefully."],
     )
 
 
 def build_review_message(
     user_id: int,
     number: int,
-    review_fn: Callable[[JobPosting], str] = fake_review,
+    review_fn: Callable[[JobPosting], JobReview | str] = fake_review,
 ) -> str:
-    """Return the text to send for `/review <number>`."""
     try:
         job = get_job(user_id, number)
     except NoSearchResultsError:
         return "You haven't searched yet. Use /search first, then /review <number>."
-    except InvalidJobNumberError as err:
-        return (
-            f"Job {err.number} isn't in your list. "
-            f"Pick a number from 1 to {err.total}."
-        )
+    except InvalidJobNumberError as error:
+        return f"Job {error.number} isn't in your list. Pick a number from 1 to {error.total}."
 
-    message = review_fn(job)
+    try:
+        answer = review_fn(job)
+    except Exception as error:
+        return f"I couldn't complete that review: {error}"
+    message = format_job_review(answer) if isinstance(answer, JobReview) else answer
     if len(message) > DISCORD_MESSAGE_LIMIT:
-        message = message[: DISCORD_MESSAGE_LIMIT - 3] + "..."
+        message = split_message(message)[0]
     return message
+
+
+async def handle_search(
+    interaction,
+    query: str,
+    parse_fn=parse_search_request,
+    search_fn=search_jobs_async,
+    save_fn=None,
+) -> None:
+    if not query.strip():
+        await interaction.response.send_message("Please provide a job search query.")
+        return
+
+    await interaction.response.send_message("Working on it...")
+    try:
+        request = parse_fn(query.strip())
+        jobs = await search_fn(request)
+    except SearchParseError as error:
+        await interaction.followup.send(str(error))
+        return
+    except JobSearchError as error:
+        await interaction.followup.send(f"Job search is unavailable: {error}")
+        return
+    except Exception:
+        await interaction.followup.send("I couldn't complete that search. Please try again.")
+        return
+
+    if not jobs:
+        await interaction.followup.send("No jobs found. Try a different search.")
+        return
+
+    if save_fn is not None:
+        save_fn(interaction.user.id, jobs)
+
+    view = JobListView(jobs, interaction.user.id)
+    # followup.send returns the sent message, which on_timeout needs
+    view.message = await interaction.followup.send(embed=view.build_embed(), view=view)
 
 
 async def handle_review(
     interaction,
     number: int,
-    review_fn: Callable[[JobPosting], str] = fake_review,
+    review_fn: Callable[[JobPosting], JobReview | str] = fake_review,
 ) -> None:
-    """Respond to a /review interaction."""
-    # The real AI review can take longer than Discord's 3-second limit,
-    # so acknowledge the command first and send the answer as a follow-up.
-    await interaction.response.defer()
-    message = build_review_message(interaction.user.id, number, review_fn)
-    await interaction.followup.send(message)
+    try:
+        await interaction.response.defer()
+        await interaction.followup.send("Working on it...")
+    except NotFound as error:
+        if error.code == 10062:
+            return
+        raise
+
+    message = await to_thread(
+        build_review_message,
+        interaction.user.id,
+        number,
+        review_fn,
+    )
+    for piece in split_message(message):
+        try:
+            await interaction.followup.send(piece)
+        except NotFound as error:
+            if error.code == 10062:
+                return
+            raise

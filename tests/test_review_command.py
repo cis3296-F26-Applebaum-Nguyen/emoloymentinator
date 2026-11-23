@@ -2,9 +2,10 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from discord.errors import NotFound
 
-from src.bot.commands import build_review_message, handle_review
-from src.core.models import JobPosting
+from src.bot.commands import build_review_message, handle_review, handle_search
+from src.core.models import JobPosting, SearchRequest
 from src.core.result_store import (
     InvalidJobNumberError,
     NoSearchResultsError,
@@ -95,12 +96,24 @@ def test_long_review_is_truncated_to_discord_limit():
 # --- /search saves results so /review can find them ---
 
 def test_search_then_review_finds_saved_job():
-    from bot.discord_bot import search
-
     search_interaction = MagicMock()
     search_interaction.user.id = 7
     search_interaction.response.send_message = AsyncMock()
-    asyncio.run(search.callback(search_interaction, "python"))
+    search_interaction.followup.send = AsyncMock()
+
+    async def fake_search(request):
+        return [
+            JobPosting(title=f"{request.search_term} job {i}", company=f"Co {i}")
+            for i in range(1, 6)
+        ]
+
+    asyncio.run(handle_search(
+        search_interaction,
+        "python",
+        parse_fn=lambda text: SearchRequest(search_term=text),
+        search_fn=fake_search,
+        save_fn=save_results,
+    ))
 
     assert "python" in get_job(7, 1).title
     assert get_job(7, 5).company
@@ -108,12 +121,10 @@ def test_search_then_review_finds_saved_job():
 
 
 def test_blank_search_does_not_save_results():
-    from bot.discord_bot import search
-
     interaction = MagicMock()
     interaction.user.id = 8
     interaction.response.send_message = AsyncMock()
-    asyncio.run(search.callback(interaction, "  "))
+    asyncio.run(handle_search(interaction, "  "))
 
     with pytest.raises(NoSearchResultsError):
         get_job(8, 1)
@@ -131,4 +142,15 @@ def test_handle_review_defers_then_sends_followup():
     asyncio.run(handle_review(interaction, 3, echo_review))
 
     interaction.response.defer.assert_awaited_once()
-    interaction.followup.send.assert_awaited_once_with("review:Job 3")
+    assert interaction.followup.send.await_args.args[0] == "review:Job 3"
+
+
+def test_handle_review_ignores_expired_interaction():
+    interaction = MagicMock()
+    interaction.response.defer = AsyncMock(
+        side_effect=NotFound(MagicMock(), {"code": 10062, "message": "Unknown interaction"})
+    )
+
+    asyncio.run(handle_review(interaction, 1, echo_review))
+
+    interaction.response.defer.assert_awaited_once()

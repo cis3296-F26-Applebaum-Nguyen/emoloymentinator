@@ -1,5 +1,5 @@
 import pytest
-from core.validation import validate_parsed_request, parse_json_reply
+from src.core.query_parser import validate_parsed_request, parse_json_reply
 
 
 def test_plain_json_is_parsed():
