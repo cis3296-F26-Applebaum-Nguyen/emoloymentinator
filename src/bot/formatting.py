@@ -1,8 +1,9 @@
 """Formats bot output for Discord."""
 
-from collections.abc import Sequence
-from ..core.models import JobPosting, JobReview
+
 import discord
+
+from ..core.models import JobPosting, JobReview
 
 DISCORD_MESSAGE_LIMIT = 2000
 

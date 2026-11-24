@@ -5,31 +5,16 @@ from collections.abc import Callable
 
 from discord.errors import NotFound
 
-from .formatting import DISCORD_MESSAGE_LIMIT, format_job_review, split_message
+from ..core.job_search import JobSearchError, search_jobs_async
 from ..core.models import JobPosting, JobReview
 from ..core.query_parser import SearchParseError, parse_search_request
-from ..core.job_search import JobSearchError, search_jobs_async
-from ..core.job_review import review_posting
 from ..core.result_store import (
     InvalidJobNumberError,
     NoSearchResultsError,
     get_job,
 )
-
+from .formatting import DISCORD_MESSAGE_LIMIT, format_job_review, split_message
 from .views import JobListView
-
-def placeholder_results(query: str) -> list[JobPosting]:
-    samples = [
-        ("Junior", "Acme Software", "Philadelphia, PA"),
-        ("Senior", "Globex Corp", "Remote"),
-        ("Intern", "Initech", "New York, NY"),
-        ("Lead", "Umbrella Labs", "Boston, MA"),
-        ("Associate", "Hooli", "Remote"),
-    ]
-    return [
-        JobPosting(title=f"{level} {query}", company=company, location=location)
-        for level, company, location in samples
-    ]
 
 
 def fake_review(job: JobPosting) -> JobReview:

@@ -1,7 +1,7 @@
 """JobSpy integration for searching jobs."""
 
-from asyncio import to_thread
 import math
+from asyncio import to_thread
 
 from .models import JobPosting, SearchRequest
 
