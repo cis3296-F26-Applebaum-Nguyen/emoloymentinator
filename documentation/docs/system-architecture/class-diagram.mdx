@@ -5,3 +5,125 @@ sidebar_label: Class Diagram
 
 # Class Diagram
 
+Most files are modules of functions, so they are marked `<<module>>`. Arrows between
+the `bot` and `core` groups only point from `bot` to `core`.
+
+```mermaid
+classDiagram
+  direction TB
+  class main_py["main.py"] {
+    <<module>>
+    +main()
+  }
+  namespace bot {
+    class bot_py["bot.py"] {
+      <<module>>
+      +create_bot() Bot
+    }
+    class commands_py["commands.py"] {
+      <<module>>
+      +handle_search()
+      +handle_review()
+    }
+    class formatting_py["formatting.py"] {
+      <<module>>
+      +build_job_embed()
+      +format_job_review()
+      +split_message()
+    }
+    class JobListView["JobListView (views.py)"] {
+      <<View>>
+      +build_embed()
+      +previous_button()
+      +next_button()
+    }
+  }
+  namespace core {
+    class config_py["config.py"] {
+      <<module>>
+      +load_config()
+    }
+    class ai_client_py["ai_client.py"] {
+      <<module>>
+      +ask_ai(prompt) str
+    }
+    class query_parser_py["query_parser.py"] {
+      <<module>>
+      +parse_search_request(text) SearchRequest
+    }
+    class job_search_py["job_search.py"] {
+      <<module>>
+      +search_jobs_async(request) List~JobPosting~
+    }
+    class job_review_py["job_review.py"] {
+      <<module>>
+      +review_posting(job) JobReview
+    }
+    class result_store_py["result_store.py"] {
+      <<module>>
+      +save_results(user_id, jobs)
+      +get_job(user_id, number) JobPosting
+    }
+    class SearchRequest {
+      <<dataclass>>
+      +search_term
+      +location
+      +job_type
+      +is_remote
+      +min_salary_annual
+      +skills
+    }
+    class JobPosting {
+      <<dataclass>>
+      +title
+      +company
+      +location
+      +url
+      +description
+      +site
+      +date_posted
+    }
+    class JobReview {
+      <<dataclass>>
+      +summary
+      +skills
+      +tech_stack
+      +cover_letter_required
+      +tips
+    }
+  }
+  namespace external {
+    class Discord["Discord (discord.py)"] {
+      <<library>>
+    }
+    class Gemini["Google Gemini API"] {
+      <<cloud API>>
+    }
+    class JobSpy["JobSpy"] {
+      <<library>>
+    }
+  }
+  main_py --> config_py
+  main_py --> bot_py
+  bot_py --> commands_py
+  bot_py ..> Discord
+  commands_py --> JobListView
+  commands_py --> formatting_py
+  commands_py --> query_parser_py
+  commands_py --> job_search_py
+  commands_py --> job_review_py
+  commands_py --> result_store_py
+  JobListView --> formatting_py
+  query_parser_py --> ai_client_py
+  job_review_py --> ai_client_py
+  ai_client_py ..> Gemini
+  job_search_py ..> JobSpy
+  query_parser_py ..> SearchRequest : returns
+  job_search_py ..> SearchRequest : takes
+  job_search_py ..> JobPosting : returns
+  job_review_py ..> JobPosting : takes
+  job_review_py ..> JobReview : returns
+  result_store_py o-- JobPosting : holds many
+```
+
+The data classes show only their main fields. See `core/models.py` for the full list.
