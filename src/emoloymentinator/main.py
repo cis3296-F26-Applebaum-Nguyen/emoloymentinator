@@ -1,8 +1,8 @@
 """Starts Employmentinator and connects bot and core components."""
 
+import sys
 from functools import partial
 from pathlib import Path
-import sys
 
 # Running this file directly does not automatically put the repository root
 # on Python's import path.
@@ -10,13 +10,13 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from src.bot.bot import create_bot
 from src.core.ai_client import ask_ai
 from src.core.config import load_config
 from src.core.job_review import review_posting
 from src.core.job_search import search_jobs_async
 from src.core.query_parser import parse_search_request
 from src.core.result_store import save_results
-from src.bot.bot import create_bot
 
 
 def main() -> None:

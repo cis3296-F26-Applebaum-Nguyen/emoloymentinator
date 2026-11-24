@@ -3,6 +3,7 @@ Communicates with the AI API.
 Sends prompts, receives responses, and handles API errors.
 """
 import time
+
 from google import genai
 from google.genai import errors
 

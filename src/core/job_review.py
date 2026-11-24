@@ -1,9 +1,10 @@
 """Reviews a job posting using the shared AI client."""
 
 import json
+from pathlib import Path
+
 from .ai_client import ask_ai as default_ask_ai
 from .models import JobPosting, JobReview
-from pathlib import Path
 
 REVIEW_PROMPT = (Path(__file__).parent / "prompts" / "review_prompt.txt").read_text(
     encoding="utf-8"
