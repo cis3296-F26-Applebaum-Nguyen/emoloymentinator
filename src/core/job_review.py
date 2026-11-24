@@ -44,13 +44,13 @@ def parse_review_response(response: str) -> JobReview:
         raise ValueError("AI returned invalid JSON") from error
 
     if not isinstance(data, dict):
-        raise ValueError("AI review must be an object")
+        raise TypeError("AI review must be an object")
     if not isinstance(data.get("summary"), str) or not data["summary"].strip():
-        raise ValueError("AI review is missing a summary")
+        raise TypeError("AI review is missing a summary")
     if not isinstance(data.get("skills"), list):
-        raise ValueError("AI review is missing skills")
+        raise TypeError("AI review is missing skills")
     if not isinstance(data.get("tips"), list):
-        raise ValueError("AI review is missing tips")
+        raise TypeError("AI review is missing tips")
 
     cover_letter = data.get("cover_letter_required")
     if "cover_letter_required" not in data or (
