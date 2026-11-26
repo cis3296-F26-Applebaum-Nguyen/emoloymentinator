@@ -13,6 +13,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 from src.bot.bot import create_bot
 from src.core.ai_client import ask_ai
 from src.core.config import load_config
+from src.core.database import initialize_database, save_search
 from src.core.job_review import review_posting
 from src.core.job_search import search_jobs_async
 from src.core.query_parser import parse_search_request
@@ -36,8 +37,11 @@ def main() -> None:
     )
     parser = partial(parse_search_request, ai_fn=ai)
     reviewer = partial(review_posting, ask_ai=ai)
+    database_path = REPOSITORY_ROOT / settings.database_path
+    initialize_database(database_path)
+    history_saver = partial(save_search, database_path)
 
-    bot = create_bot(parser, search_jobs_async, save_results, reviewer)
+    bot = create_bot(parser, search_jobs_async, save_results, reviewer, save_history_fn=history_saver)
     bot.run(settings.discord_token)
 
 

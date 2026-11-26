@@ -7,7 +7,7 @@ from discord.ext import commands
 from .commands import handle_review, handle_search
 
 
-def create_bot(parse_fn, search_fn, save_fn, review_fn) -> commands.Bot:
+def create_bot(parse_fn, search_fn, save_fn, review_fn,save_history_fn=None) -> commands.Bot:
     intents = discord.Intents.default()
     bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -24,6 +24,7 @@ def create_bot(parse_fn, search_fn, save_fn, review_fn) -> commands.Bot:
             parse_fn=parse_fn,
             search_fn=search_fn,
             save_fn=save_fn,
+            save_history_fn=save_history_fn,
         )
 
     @bot.tree.command(name="review", description="Get an AI review of a job from your last search")

@@ -1,5 +1,6 @@
 """Handles Discord slash command behavior."""
 
+import logging
 from asyncio import to_thread
 from collections.abc import Callable
 
@@ -52,6 +53,7 @@ async def handle_search(
     parse_fn=parse_search_request,
     search_fn=search_jobs_async,
     save_fn=None,
+    save_history_fn=None,
 ) -> None:
     if not query.strip():
         await interaction.response.send_message("Please provide a job search query.")
@@ -77,6 +79,20 @@ async def handle_search(
 
     if save_fn is not None:
         save_fn(interaction.user.id, jobs)
+
+    # NEW: Save search history to the persistent database
+    if save_history_fn is not None:
+        try:
+            await to_thread(
+                save_history_fn,
+                interaction.user.id,
+                request,
+                jobs,
+            )
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "Failed to save job search history."
+            )
 
     view = JobListView(jobs, interaction.user.id)
     # followup.send returns the sent message, which on_timeout needs
