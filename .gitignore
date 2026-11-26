@@ -18,7 +18,7 @@ __pycache__/
 pyproject.toml
 uv.lock
 
-data*
+/data/
 
 # Local SQLite database files
 *.db
