@@ -14,6 +14,8 @@ class SearchRequest:
     country_indeed: str | None = None
     min_salary_annual: int | None = None
     skills: list[str] = field(default_factory=list)
+    # "City, ST" places the AI resolved an informal area into (e.g. "the Main Line")
+    area_places: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -25,6 +27,7 @@ class JobPosting:
     description: str | None = None
     site: str | None = None          # which job board it came from
     date_posted: str | None = None   # kept as text, so no date handling needed
+    is_remote: bool | None = None
 
 
 @dataclass

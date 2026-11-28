@@ -7,6 +7,7 @@ from collections.abc import Callable
 from discord.errors import NotFound
 
 from ..core.job_search import JobSearchError, search_jobs_async
+from ..core.location import location_notice
 from ..core.models import JobPosting, JobReview
 from ..core.query_parser import SearchParseError, parse_search_request
 from ..core.result_store import (
@@ -93,6 +94,10 @@ async def handle_search(
             logging.getLogger(__name__).exception(
                 "Failed to save job search history."
             )
+
+    notice = location_notice(request, jobs)
+    if notice:
+        await interaction.followup.send(notice)
 
     view = JobListView(jobs, interaction.user.id)
     # followup.send returns the sent message, which on_timeout needs

@@ -3,7 +3,11 @@
 import math
 from asyncio import to_thread
 
+from .location import location_filter_applies, refine_jobs
 from .models import JobPosting, SearchRequest
+
+RESULT_LIMIT = 20
+FETCH_LIMIT = 40
 
 try:
     from jobspy import scrape_jobs
@@ -27,7 +31,8 @@ def search_jobs(request: SearchRequest) -> list[JobPosting]:
         "is_remote": request.is_remote,
         "job_type": request.job_type,
         "hours_old": request.hours_old,
-        "results_wanted": 20,
+        # fetch extra rows when we will filter by location, then trim to RESULT_LIMIT
+        "results_wanted": FETCH_LIMIT if location_filter_applies(request) else RESULT_LIMIT,
         "country_indeed": request.country_indeed or "USA",
     }
     kwargs = {key: value for key, value in kwargs.items() if value is not None}
@@ -43,6 +48,14 @@ def search_jobs(request: SearchRequest) -> list[JobPosting]:
         if not text or text.lower() in {"nan", "<na>", "none"}:
             return None
         return text
+
+    def remote_value(value) -> bool | None:
+        if isinstance(value, bool):
+            return value
+        text = text_value(value)
+        if text is None:
+            return None
+        return text.lower() in {"true", "1", "yes"}
 
     jobs = []
     for _, row in frame.iterrows():
@@ -78,9 +91,10 @@ def search_jobs(request: SearchRequest) -> list[JobPosting]:
             description=text_value(row.get("description")),
             site=text_value(row.get("site")),
             date_posted=text_value(row.get("date_posted")),
+            is_remote=remote_value(row.get("is_remote")),
         ))
 
-    return jobs
+    return refine_jobs(jobs, request, limit=RESULT_LIMIT)
 
 
 async def search_jobs_async(request: SearchRequest) -> list[JobPosting]:

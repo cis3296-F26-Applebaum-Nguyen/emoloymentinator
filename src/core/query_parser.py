@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from .ai_client import ask_ai
+from .location import classify_request_location, resolve_area
 from .models import SearchRequest
 
 
@@ -111,7 +112,7 @@ def parse_search_request(user_text: str, ai_fn=ask_ai) -> SearchRequest:
 
             params = clean["jobspy_params"]
             filters = clean["post_filters"]
-            return SearchRequest(
+            request = SearchRequest(
                 search_term=params["search_term"],
                 location=params["location"],
                 distance=params["distance"],
@@ -122,6 +123,9 @@ def parse_search_request(user_text: str, ai_fn=ask_ai) -> SearchRequest:
                 min_salary_annual=filters["min_salary_annual"],
                 skills=filters["skills"],
             )
+            if request.location is not None and classify_request_location(request.location) == "area":
+                request.area_places = resolve_area(request.location, ai_fn)
+            return request
         except SearchParseError:
             raise
         except (ValueError, json.JSONDecodeError):
