@@ -1,7 +1,14 @@
 import asyncio
+from functools import partial
 from unittest.mock import AsyncMock, MagicMock
 
 from src.bot.bot import create_bot
+from src.core.database import (
+    initialize_database,
+    save_search,
+    get_search_history,
+    get_search_jobs,
+)
 from src.core.models import JobPosting, SearchRequest
 
 
@@ -48,3 +55,41 @@ def test_search_blank_query_asks_for_input():
     interaction.response.send_message.assert_awaited_once_with(
         "Please provide a job search query."
     )
+
+def test_search_saves_history(tmp_path):
+    db_path = tmp_path / "history.db"
+    initialize_database(db_path)
+
+    interaction = MagicMock()
+    interaction.user.id = 12345
+    interaction.response.send_message = AsyncMock()
+    interaction.followup.send = AsyncMock()
+
+    jobs = [
+        JobPosting(title="Python Developer", company="Acme"),
+        JobPosting(title="Software Engineer", company="Acme"),
+    ]
+
+    async def fake_search(request):
+        return jobs
+
+    bot = create_bot(
+        lambda text: SearchRequest(search_term=text),
+        fake_search,
+        lambda user_id, jobs: None,
+        lambda job: "review",
+        save_history_fn=partial(save_search, db_path),
+    )
+
+    search = bot.tree.get_command("search")
+    asyncio.run(search.callback(interaction, "Python developer"))
+
+    history = get_search_history(db_path, 12345)
+
+    assert len(history) == 1
+    assert history[0]["search_criteria"]["search_term"] == "Python developer"
+
+    search_id = history[0]["search_id"]
+
+    assert get_search_jobs(db_path, 12345, search_id) == jobs
+    interaction.followup.send.assert_awaited_once()

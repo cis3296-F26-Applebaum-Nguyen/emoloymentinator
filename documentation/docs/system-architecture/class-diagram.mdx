@@ -64,6 +64,13 @@ classDiagram
       +save_results(user_id, jobs)
       +get_job(user_id, number) JobPosting
     }
+    class database_py["database.py"] {
+      <<module>>
+      +initialize_database(db_path)
+      +save_search(db_path, user_id, request, jobs) int
+      +get_search_history(db_path, user_id) List
+      +get_search_jobs(db_path, user_id, search_id) List~JobPosting~
+    }
     class SearchRequest {
       <<dataclass>>
       +search_term
@@ -124,6 +131,10 @@ classDiagram
   job_review_py ..> JobPosting : takes
   job_review_py ..> JobReview : returns
   result_store_py o-- JobPosting : holds many
+  main_py --> database_py
+  commands_py ..> database_py : injected history saver
+  database_py ..> SearchRequest : takes
+  database_py ..> JobPosting : stores and retrieves
 ```
 
 The data classes show only their main fields. See `core/models.py` for the full list.
